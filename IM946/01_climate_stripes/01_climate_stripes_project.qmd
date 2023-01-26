@@ -1,0 +1,279 @@
+---
+title: "Climate Stripes"
+author: "Carlos Cámara"
+format:
+  html:
+    toc: true
+    reference-location: margin
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| warning: false
+
+library(tidyverse)
+
+
+```
+
+## The target Visualisation
+
+![](https://showyourstripes.info/stripes/GLOBE---1850-2021-MO.png)
+
+From [https://showyourstripes.info/s/globe](https://showyourstripes.info)
+
+> These 'warming stripe' graphics are visual representations of the change in temperature as measured in each country over the past 100+ years. Each stripe or bar represents the temperature in that country averaged over a year. For most countries, the stripes start in the year 1901 and finish in 2021. For the ocean basins and for several countries with longer datasets available the stripes start in the 19th century instead. For two cities (Stockholm and Vienna), the data starts in the 18th century.
+
+### Understanding the underlying data
+
+We are using [HadCRUT5](https://www.metoffice.gov.uk/hadobs/hadcrut5/) dataset, provided by the Met Office Hadley Centre and the [Climatic Research Unit at the University of East Anglia](http://www.cru.uea.ac.uk/).
+
+From the official website:
+
+> HadCRUT5 is a gridded dataset of global historical surface temperature anomalies relative to a 1961-1990 reference period. Data are available for each month from January 1850 onwards, on a 5 degree grid and as global and regional average time series. \[...\]
+>
+> **Brief description of the data**
+>
+> The gridded data are a blend of the [CRUTEM5](https://www.metoffice.gov.uk/hadobs/crutem5) land-surface air temperature dataset and the [HadSST](https://www.metoffice.gov.uk/hadobs/hadsst4) sea-surface temperature (SST) dataset. The dataset is presented in two ways. First, as with the previous version of the data set, HadCRUT4, data are averaged onto a regular grid with no value provided in grid cells containing no observations. Second, a statistical method has been used to extend coverage in data sparse areas and provide a more globally complete data set.
+>
+> Both forms of the dataset are presented as an ensemble of 200 dataset realisations that sample the distribution of uncertainty. For the non-infilled data set, the ensemble represents uncertainties in methods used to account for changes in SST measurement practices, homogenisation of land station records and the potential impacts of urbanisation. The ensemble generated from the statistical analysis includes these uncertainties as well as uncertainty arising from measurement error, under-sampling at a grid cell level and uncertainty in the statistical reconstruction.
+
+Let's explore the data, then:
+
+```{r}
+southernHemisphere <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series.southern_hemisphere.annual.csv")
+
+knitr::kable(head(southernHemisphere))
+```
+
+For the stripes only one column is needed: `Anomaly..deg.C.` , which is calculated as follows[^1]:
+
+[^1]: For a detailed explanations of the methods used to calculate the variable, refer to [Morice,
+    C.P., J.J. Kennedy, N.A. Rayner, J.P. Winn, E. Hogan, R.E. Killick,
+    R.J.H. Dunn, T.J. Osborn, P.D. Jones and I.R. Simpson (in press) An
+    updated assessment of near-surface temperature change from 1850: the
+    HadCRUT5 dataset. Journal of Geophysical Research (Atmospheres)
+    doi:10.1029/2019JD032361](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_accepted.pdf) ([supporting information](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_supporting_information_accepted.pdf)).
+    		
+
+> "*For each country, the average temperature in 1971-2000 is set as the boundary between blue and red colours, and the colour scale varies from +/- 2.6 standard deviations of the annual average temperatures between 1901-2000. For the global average only, the UK Met Office [HadCRUT5.0 dataset](https://www.metoffice.gov.uk/hadobs/hadcrut5/ "https://www.metoffice.gov.uk/hadobs/hadcrut5/") is used and the colour scale goes from -0.75°C to +0.75°C. The stripes are usually shown for the period 1901-2021 but this can be longer or slightly shorter depending on the location and whether the data is available & considered robust*."
+>
+> \-- <https://showyourstripes.info/faq>
+
+Let's prepare a simpler dataframe and explore the variables that we will be using:
+
+```{r}
+df_south <- southernHemisphere %>% 
+  select(Time, Anomaly..deg.C.) %>% 
+  rename(Anomaly = Anomaly..deg.C.)
+
+summary(df_south)
+```
+
+And as seen above, `Anomaly` ranges from `r min(southernHemisphere$Anomaly..deg.C.)` to `r max(southernHemisphere$Anomaly..deg.C.)`.
+
+## Deconstructing the visualisation
+
+### Visualising the data
+
+The first step to understand the visualisation is to visualise the dataset:
+
+::: panel-tabset
+##### Base R
+
+```{r}
+plot(df_south$Time, df_south$Anomaly)
+```
+
+##### GGplot
+
+```{r}
+ggplot(df_south, aes(x = Time, y = Anomaly)) + 
+  geom_point()
+```
+:::
+
+Or in a barplot:
+
+::: panel-tabset
+##### Base R
+
+```{r}
+barplot(df_south$Anomaly)
+```
+
+##### Ggplot
+
+```{r}
+ggplot(df_south, aes(x = Time, y = Anomaly)) +
+  geom_bar(stat="identity")
+```
+:::
+
+### Adding colour
+
+We could add colours to those visualisations, but we need to understand how colours work.
+
+First, define our color palette. We will be using [`{colorspace}`](https://colorspace.r-forge.r-project.org/articles/colorspace.html) package[^2], which provides a series of colour palettes, each of them aimed at different use cases:
+
+[^2]: Another alternative could be using [RColorBrewer](https://renenyffenegger.ch/notes/development/languages/R/packages/RColorBrewer/index), which implements colorbrewer palettes, which are used a lot in maps: <https://colorbrewer2.org>
+
+-   Diverging
+-   Sequential
+-   Diverging
+
+```{r}
+library(colorspace)
+
+hcl_palettes(plot = TRUE, type = "Qualitative")
+hcl_palettes(plot = TRUE, type = "Sequential")
+hcl_palettes(plot = TRUE, type = "Diverging")
+
+```
+
+It seems that the colour palette that the original stripe is using is a diverging palette, and most specifically a Blue-Red variation, probably closer to `Blue-Red 3`
+
+#### Defining colour breaks
+
+In turn, each palette can have different number of colour breaks:
+
+```{r}
+
+hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3")
+hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3", n = 7)
+hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3", n = 9)
+```
+
+### Putting it together
+
+```{r}
+color_palette <- "Blue-Red 3"
+breaks <- 7
+
+myColours <- diverge_hcl( n = breaks, palette = color_palette )
+```
+
+::: panel-tabset
+##### Base R
+
+```{r}
+plot(df_south$Time, df_south$Anomaly)
+```
+
+##### GGplot
+
+```{r}
+ggplot(df_south, aes(x = Time, y = Anomaly, color = Anomaly)) + 
+  geom_point() +
+  scale_color_binned_diverging(palette = color_palette, n.breaks = breaks)
+```
+:::
+
+Or in a barplot:
+
+::: panel-tabset
+##### Base R
+
+```{r}
+barplot(df_south$Anomaly)
+```
+
+##### Ggplot
+
+```{r}
+ggplot(df_south, aes(x = Time, y = Anomaly, fill = Anomaly)) +
+  geom_bar(stat="identity") +
+  scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks)
+```
+:::
+
+## Replicating the original
+
+::: panel-tabset
+##### Base R
+
+```{r}
+barplot(df_south$Anomaly)
+```
+
+##### Ggplot
+
+```{r}
+ggplot(df_south, aes(x = Time, y = 1, fill = Anomaly)) +
+  geom_bar(stat="identity", width = 1) +
+  scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
+  theme_void() +
+  theme(legend.position="none") +
+  labs(title = "test") 
+```
+:::
+
+## Testing the original
+
+```{r}
+df_south <- df_south %>% 
+  mutate(location = "southern hemisphere")
+
+df_north <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series.northern_hemisphere.annual.csv") %>% 
+  select(Time, Anomaly..deg.C.) %>% 
+  rename(Anomaly = Anomaly..deg.C.) %>% 
+  mutate(location = "southern hemisphere")
+
+# Joining together
+df <- df_south %>% 
+  bind_rows(df_north)
+  
+```
+
+## Extending the original
+
+```{r}
+#| column: page
+#| fig.width: 11
+
+p <- ggplot(df_south, aes(x = Time)) +
+  geom_bar(aes( y = 1, fill = Anomaly), stat="identity", width = 1) +
+  geom_bar(aes( y = -1, fill = Anomaly), stat="identity", width = 1) +
+  scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
+  geom_hline(yintercept = 0, linetype='dotted', col = "black") +
+  annotate("text", x = 1900, y = 0, label = "Avg Temp between 1901-2000", 
+           col = "black",
+           vjust = -0.5) +
+  geom_line(aes(y = Anomaly), col = "white") +
+  # guides(y = "none") + 
+  theme_minimal() +
+  theme(legend.position="top",
+        legend.direction="horizontal",
+        legend.justification = c(0,0)) +
+  labs(title = paste("Temperature anomaly in the Southern Emisphere between", 
+                     min(df_south$Time), "and", max(df_south$Time)),
+       subtitle = "As compared to the average temperature between 1901-2000",
+       caption = "Source: HadCRUT5",
+       x = NULL, y = NULL) 
+p
+```
+
+```{r}
+ggplot(df, aes(x = Time)) +
+  geom_bar(aes( y = 1, fill = Anomaly), stat="identity", width = 1) +
+  geom_bar(aes( y = -1, fill = Anomaly), stat="identity", width = 1) +
+  scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
+  geom_hline(yintercept = 0, linetype='dotted', col = "black") +
+  annotate("text", x = 1900, y = 0, label = "Avg Temp between 1901-2000", 
+           col = "black",
+           vjust = -0.5) +
+  geom_line(aes(y = Anomaly), col = "white") +
+  # guides(y = "none") + 
+  theme_minimal() +
+  theme(legend.position="top",
+        legend.direction="horizontal",
+        legend.justification = c(0,0)) +
+  labs(title = paste("Temperature anomaly in the Southern Emisphere between", 
+                     min(df_south$Time), "and", max(df_south$Time)),
+       subtitle = "As compared to the average temperature between 1901-2000",
+       caption = "Source: HadCRUT5",
+       x = NULL, y = NULL) +  
+  facet_wrap(vars(location)) 
+
+```
