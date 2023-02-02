@@ -4,6 +4,7 @@ author: "Carlos Cámara"
 format:
   html:
     toc: true
+    # code-line-numbers: true
     reference-location: margin
 editor: visual
 ---
@@ -19,11 +20,23 @@ library(tidyverse)
 
 ## The target Visualisation
 
-![](https://showyourstripes.info/stripes/GLOBE---1850-2021-MO.png)
+![Climate stripes, as created by Ed Hawkins](https://showyourstripes.info/stripes/GLOBE---1850-2021-MO.png)
 
 From [https://showyourstripes.info/s/globe](https://showyourstripes.info)
 
 > These 'warming stripe' graphics are visual representations of the change in temperature as measured in each country over the past 100+ years. Each stripe or bar represents the temperature in that country averaged over a year. For most countries, the stripes start in the year 1901 and finish in 2021. For the ocean basins and for several countries with longer datasets available the stripes start in the 19th century instead. For two cities (Stockholm and Vienna), the data starts in the 18th century.
+
+### Some variations
+
+The visualisation is very popular, and there have been a number of different variations[^1]
+
+[^1]: Ed Hawkins has created a facebook group to share that https://www.facebook.com/ed.hawkins.climate/ and
+
+::: column-page
+![Climate stripes' variations](img/climate_stripes_variations.png)
+:::
+
+## Deconstructing the visualisation
 
 ### Understanding the underlying data
 
@@ -47,15 +60,9 @@ southernHemisphere <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series
 knitr::kable(head(southernHemisphere))
 ```
 
-For the stripes only one column is needed: `Anomaly..deg.C.` , which is calculated as follows[^1]:
+For the stripes only one column is needed: `Anomaly..deg.C.` , which is calculated as follows[^2]:
 
-[^1]: For a detailed explanations of the methods used to calculate the variable, refer to [Morice,
-    C.P., J.J. Kennedy, N.A. Rayner, J.P. Winn, E. Hogan, R.E. Killick,
-    R.J.H. Dunn, T.J. Osborn, P.D. Jones and I.R. Simpson (in press) An
-    updated assessment of near-surface temperature change from 1850: the
-    HadCRUT5 dataset. Journal of Geophysical Research (Atmospheres)
-    doi:10.1029/2019JD032361](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_accepted.pdf) ([supporting information](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_supporting_information_accepted.pdf)).
-    		
+[^2]: For a detailed explanations of the methods used to calculate the variable, refer to [Morice, C.P., J.J. Kennedy, N.A. Rayner, J.P. Winn, E. Hogan, R.E. Killick, R.J.H. Dunn, T.J. Osborn, P.D. Jones and I.R. Simpson (in press) An updated assessment of near-surface temperature change from 1850: the HadCRUT5 dataset. Journal of Geophysical Research (Atmospheres) doi:10.1029/2019JD032361](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_accepted.pdf) ([supporting information](https://www.metoffice.gov.uk/hadobs/hadcrut5/HadCRUT5_supporting_information_accepted.pdf)).
 
 > "*For each country, the average temperature in 1971-2000 is set as the boundary between blue and red colours, and the colour scale varies from +/- 2.6 standard deviations of the annual average temperatures between 1901-2000. For the global average only, the UK Met Office [HadCRUT5.0 dataset](https://www.metoffice.gov.uk/hadobs/hadcrut5/ "https://www.metoffice.gov.uk/hadobs/hadcrut5/") is used and the colour scale goes from -0.75°C to +0.75°C. The stripes are usually shown for the period 1901-2021 but this can be longer or slightly shorter depending on the location and whether the data is available & considered robust*."
 >
@@ -71,9 +78,7 @@ df_south <- southernHemisphere %>%
 summary(df_south)
 ```
 
-And as seen above, `Anomaly` ranges from `r min(southernHemisphere$Anomaly..deg.C.)` to `r max(southernHemisphere$Anomaly..deg.C.)`.
-
-## Deconstructing the visualisation
+And as seen above, `Anomaly` ranges from ``r min(southernHemisphere$Anomaly..deg.C.)`` to ``r max(southernHemisphere$Anomaly..deg.C.)``.
 
 ### Visualising the data
 
@@ -115,9 +120,9 @@ ggplot(df_south, aes(x = Time, y = Anomaly)) +
 
 We could add colours to those visualisations, but we need to understand how colours work.
 
-First, define our color palette. We will be using [`{colorspace}`](https://colorspace.r-forge.r-project.org/articles/colorspace.html) package[^2], which provides a series of colour palettes, each of them aimed at different use cases:
+First, define our color palette. We will be using [`{colorspace}`](https://colorspace.r-forge.r-project.org/articles/colorspace.html) package[^3], which provides a series of colour palettes, each of them aimed at different use cases:
 
-[^2]: Another alternative could be using [RColorBrewer](https://renenyffenegger.ch/notes/development/languages/R/packages/RColorBrewer/index), which implements colorbrewer palettes, which are used a lot in maps: <https://colorbrewer2.org>
+[^3]: Another alternative could be using [RColorBrewer](https://renenyffenegger.ch/notes/development/languages/R/packages/RColorBrewer/index), which implements colorbrewer palettes, which are used a lot in maps: <https://colorbrewer2.org>
 
 -   Diverging
 -   Sequential
@@ -139,26 +144,49 @@ It seems that the colour palette that the original stripe is using is a divergin
 In turn, each palette can have different number of colour breaks:
 
 ```{r}
-
+par(mfrow = c(3, 1))
 hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3")
 hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3", n = 7)
 hcl_palettes(plot = TRUE, type = "Diverging", palette = "Blue-Red 3", n = 9)
 ```
 
+Now we
+
 ### Putting it together
 
 ```{r}
+# Save common parameters into variables.
 color_palette <- "Blue-Red 3"
 breaks <- 7
 
-myColours <- diverge_hcl( n = breaks, palette = color_palette )
+
 ```
 
 ::: panel-tabset
 ##### Base R
 
 ```{r}
-plot(df_south$Time, df_south$Anomaly)
+# Create our color palette.
+myColours <- diverge_hcl(n = breaks, palette = color_palette)
+
+# and I want the 'right' colour for each data point
+# i.e. 'myDataInColours'
+
+# how much data I want in each colour bin... (i.e. quantiles or something else)    
+myDensities <- seq(0, 1, l = breaks + 1)
+
+# find the values for the bin containing each denisty
+myDataBins <- quantile( x = df_south$Anomaly, probs = myDensities )
+        
+# find which bin the data are in
+myColourIndices <- findInterval(x=df_south$Anomaly, vec = myDataBins, all.inside = T )
+
+# ... then I will have my Data In Colours!
+myDataInColours <- myColours[ myColourIndices ]
+
+    
+# Plot the result 
+plot(df_south$Time, df_south$Anomaly, pch=19, cex=2, col=myDataInColours )
 ```
 
 ##### GGplot
@@ -166,7 +194,7 @@ plot(df_south$Time, df_south$Anomaly)
 ```{r}
 ggplot(df_south, aes(x = Time, y = Anomaly, color = Anomaly)) + 
   geom_point() +
-  scale_color_binned_diverging(palette = color_palette, n.breaks = breaks)
+  scale_color_binned_diverging(palette = color_palette, n.breaks = breaks) #<
 ```
 :::
 
@@ -176,12 +204,35 @@ Or in a barplot:
 ##### Base R
 
 ```{r}
-barplot(df_south$Anomaly)
+#| code-fold: true
+
+# Create our color palette.
+myColours <- diverge_hcl(n = breaks, palette = color_palette)
+
+# and I want the 'right' colour for each data point
+# i.e. 'myDataInColours'
+
+# how much data I want in each colour bin... (i.e. quantiles or something else)    
+myDensities <- seq(0, 1, l = breaks + 1)
+
+# find the values for the bin containing each denisty
+myDataBins <- quantile( x = df_south$Anomaly, probs = myDensities )
+        
+# find which bin the data are in
+myColourIndices <- findInterval(x=df_south$Anomaly, vec = myDataBins, all.inside = T )
+
+# ... then I will have my Data In Colours!
+myDataInColours <- myColours[ myColourIndices ]
+
+    
+# Plot the result 
+barplot(df_south$Anomaly, col=myDataInColours, border = NA)
 ```
 
 ##### Ggplot
 
 ```{r}
+#| code-fold: true
 ggplot(df_south, aes(x = Time, y = Anomaly, fill = Anomaly)) +
   geom_bar(stat="identity") +
   scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks)
@@ -194,7 +245,9 @@ ggplot(df_south, aes(x = Time, y = Anomaly, fill = Anomaly)) +
 ##### Base R
 
 ```{r}
-barplot(df_south$Anomaly)
+df_south$height = 1
+barplot(df_south$height, col=myDataInColours, border = NA, space = 0, 
+        ann=FALSE, yaxt='n')
 ```
 
 ##### Ggplot
@@ -209,24 +262,15 @@ ggplot(df_south, aes(x = Time, y = 1, fill = Anomaly)) +
 ```
 :::
 
-## Testing the original
+## Tweaking the original
 
-```{r}
-df_south <- df_south %>% 
-  mutate(location = "southern hemisphere")
-
-df_north <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series.northern_hemisphere.annual.csv") %>% 
-  select(Time, Anomaly..deg.C.) %>% 
-  rename(Anomaly = Anomaly..deg.C.) %>% 
-  mutate(location = "southern hemisphere")
-
-# Joining together
-df <- df_south %>% 
-  bind_rows(df_north)
-  
-```
+What would happen if we changed the colour scale? And if we changed the binning method?
 
 ## Extending the original
+
+### Adding overlays and annotations
+
+I find the original to be so simple that it is difficult to interpret, or lacks a clear message.
 
 ```{r}
 #| column: page
@@ -237,10 +281,12 @@ p <- ggplot(df_south, aes(x = Time)) +
   geom_bar(aes( y = -1, fill = Anomaly), stat="identity", width = 1) +
   scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
   geom_hline(yintercept = 0, linetype='dotted', col = "black") +
-  annotate("text", x = 1900, y = 0, label = "Avg Temp between 1901-2000", 
-           col = "black",
-           vjust = -0.5) +
-  geom_line(aes(y = Anomaly), col = "white") +
+  annotate("text", x = 1855, y = 0, label = "Avg Temp between 1901-2000", 
+           col = "#333333",
+           vjust = -0.5,
+           hjust = 0,
+           fontface = "bold") +
+  geom_line(aes(y = Anomaly), linewidth = 1.1, col = "white") +
   # guides(y = "none") + 
   theme_minimal() +
   theme(legend.position="top",
@@ -254,26 +300,78 @@ p <- ggplot(df_south, aes(x = Time)) +
 p
 ```
 
+### Comparing data from different areas
+
 ```{r}
-ggplot(df, aes(x = Time)) +
-  geom_bar(aes( y = 1, fill = Anomaly), stat="identity", width = 1) +
-  geom_bar(aes( y = -1, fill = Anomaly), stat="identity", width = 1) +
+df_south <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series.southern_hemisphere.annual.csv") %>% 
+  select(Time, Anomaly..deg.C.) %>% 
+  rename(Anomaly = Anomaly..deg.C.) %>% 
+  mutate(location = "southern hemisphere")
+
+df_north <- read.csv("data/raw/HadCRUT.5.0.1.0.analysis.summary_series.northern_hemisphere.annual.csv") %>% 
+  select(Time, Anomaly..deg.C.) %>% 
+  rename(Anomaly = Anomaly..deg.C.) %>% 
+  mutate(location = "northern hemisphere")
+
+# Joining together
+df <- df_south %>% 
+  bind_rows(df_north)
+  
+```
+
+```{r}
+ggplot(df, aes(x = Time, y = 1, fill = Anomaly)) +
+  geom_bar(stat="identity", width = 1) +
+  scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
+  theme_minimal() +
+  theme(legend.position="none") +
+  # labs(title = "test")  +
+  facet_grid(location ~ .)
+
+  
+
+```
+
+
+```{r}
+#| column: page
+#| fig.width: 11
+
+# Max values differ for south and north. Making sure that the stripes cover the
+# entire line chart.
+stripe_height <- max(df$Anomaly) + 0.2 * max(df$Anomaly)
+
+p <- ggplot(df, aes(x = Time)) +
+  geom_bar(aes( y = stripe_height, fill = Anomaly), stat="identity", width = 1) +
+  geom_bar(aes( y = -stripe_height, fill = Anomaly), stat="identity", width = 1) +
   scale_fill_binned_diverging(palette = color_palette, n.breaks = breaks) +
   geom_hline(yintercept = 0, linetype='dotted', col = "black") +
   annotate("text", x = 1900, y = 0, label = "Avg Temp between 1901-2000", 
            col = "black",
            vjust = -0.5) +
-  geom_line(aes(y = Anomaly), col = "white") +
+  geom_line(aes(y = Anomaly), linewidth = 2, col = "black") +
   # guides(y = "none") + 
   theme_minimal() +
-  theme(legend.position="top",
+  theme(legend.position="bottom",
         legend.direction="horizontal",
         legend.justification = c(0,0)) +
-  labs(title = paste("Temperature anomaly in the Southern Emisphere between", 
+  labs(title = paste("Temperature anomaly between", 
                      min(df_south$Time), "and", max(df_south$Time)),
        subtitle = "As compared to the average temperature between 1901-2000",
        caption = "Source: HadCRUT5",
-       x = NULL, y = NULL) +  
-  facet_wrap(vars(location)) 
+       x = NULL, y = NULL)  +
+  facet_grid(location ~ .)
+
+p
 
 ```
+```{r}
+library(plotly)
+
+ggplotly(p)
+```
+
+
+## References and Resources
+
+* <https://arctrain.de/arctic-stripes/>
